@@ -178,7 +178,7 @@
       }
       const alreadyVoted = votes.find(v => v.voter === ownName);
       if (alreadyVoted) {
-        if (!confirm("You’ve already voted. Replace vote?")) return;
+        if (!confirm("You’ve already voted. Replace vote? ")) return;
         votes = votes.filter(v => v.voter !== ownName);
       }
       votes.push({ voter: ownName, department: ownDept, preferences });
