@@ -3,280 +3,254 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Preferential Voting & Intelligent Team Generator</title>
+  <title>Ranked Voting & Team Generator</title>
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; max-width: 900px; }
     .section { margin-bottom: 30px; }
     input, select, button { margin: 5px; padding: 5px; }
     label { display: block; margin-top: 10px; }
     pre { background: #f3f3f3; padding: 10px; white-space: pre-wrap; }
+    .rank-label { margin-top: 10px; font-weight: bold; }
   </style>
 </head>
 <body>
 
-  <h2>1. Setup Departments and Candidates</h2>
-  <div class="section">
-    <label>Add Department:</label>
-    <input type="text" id="departmentName" placeholder="e.g., Writing">
-    <button onclick="addDepartment()">Add Department</button>
+<h2>1. Setup Departments and Candidates</h2>
+<div class="section">
+  <label>Add Department:</label>
+  <input type="text" id="departmentName" placeholder="e.g., Writing">
+  <button id="addDeptBtn">Add Department</button>
 
-    <label>Add Candidate to Department:</label>
-    <select id="departmentSelect"></select>
-    <input type="text" id="candidateName" placeholder="e.g., Alice">
-    <button onclick="addCandidate()">Add Candidate</button>
+  <label>Add Candidate to Department:</label>
+  <select id="departmentSelect"></select>
+  <input type="text" id="candidateName" placeholder="e.g., Alice">
+  <button id="addCandBtn">Add Candidate</button>
 
-    <p><strong>Current Setup:</strong></p>
-    <pre id="setupDisplay"></pre>
-  </div>
+  <p><strong>Current Setup:</strong></p>
+  <pre id="setupDisplay"></pre>
+</div>
 
-  <h2>2. Voting Interface</h2>
-  <div class="section">
-    <label>Select Your Department:</label>
-    <select id="voterDept" onchange="updateVoterNames()"></select>
+<h2>2. Voting Interface</h2>
+<div class="section">
+  <label>Select Your Department:</label>
+  <select id="voterDept" onchange="updateVoterNames()"></select>
 
-    <label>Select Your Name:</label>
-    <select id="voterName"></select>
+  <label>Select Your Name:</label>
+  <select id="voterName"></select>
 
-    <div id="votingArea"></div>
-    <button onclick="submitVote()">Submit Vote</button>
-    <p id="voteMsg"></p>
-  </div>
+  <div id="votingArea"></div>
+  <button onclick="submitVote()">Submit Vote</button>
+  <p id="voteMsg"></p>
+</div>
 
-  <h2>3. Team Generation</h2>
-  <div class="section">
-    <button onclick="generateTeams()">Generate Teams</button>
-    <pre id="teamsDisplay"></pre>
-    <button onclick="downloadTeamsTxt()">Download Teams (.txt)</button>
-  </div>
+<h2>3. Team Generation</h2>
+<div class="section">
+  <button onclick="generateTeams()">Generate Teams</button>
+  <pre id="teamsDisplay"></pre>
+  <button onclick="downloadTeamsTxt()">Download Teams (.txt)</button>
+</div>
 
-  <h2>4. Tools</h2>
-  <div class="section">
-    <button onclick="exportVotes()">Export Votes (JSON)</button>
-    <button onclick="document.getElementById('importFile').click()">Import Voting Session (JSON)</button>
-    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importVotes(event)">
-    <button onclick="resetAll()">Reset All Data</button>
-  </div>
+<h2>4. Tools</h2>
+<div class="section">
+  <button onclick="exportVotes()">Export Votes (JSON)</button>
+  <button onclick="document.getElementById('importFile').click()">Import Voting Session (JSON)</button>
+  <input type="file" id="importFile" accept=".json" style="display:none" onchange="importVotes(event)">
+  <button onclick="resetAll()">Reset All Data</button>
+</div>
 
-  <script>
-    let departments = JSON.parse(localStorage.getItem("departments") || "{}");
-    let votes = JSON.parse(localStorage.getItem("votes") || "[]");
+<script>
+let departments = JSON.parse(localStorage.getItem("departments") || "{}");
+let votes = JSON.parse(localStorage.getItem("votes") || "[]");
+const greekNames = ["Alpha","Beta","Gamma","Delta","Epsilon","Zeta","Eta","Theta","Iota","Kappa",
+"Lambda","Mu","Nu","Xi","Omicron","Pi","Rho","Sigma","Tau","Upsilon","Phi","Chi","Psi","Omega"];
 
-    const greekNames = [
-      "Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta", "Eta", "Theta", "Iota", "Kappa",
-      "Lambda", "Mu", "Nu", "Xi", "Omicron", "Pi", "Rho", "Sigma", "Tau", "Upsilon",
-      "Phi", "Chi", "Psi", "Omega"
-    ];
-
-    document.addEventListener("DOMContentLoaded", () => {
-      updateSetupDisplay();
-      updateVotingSelectors();
-      document.getElementById("departmentName").addEventListener("keypress", e => { if (e.key === "Enter") addDepartment(); });
-      document.getElementById("candidateName").addEventListener("keypress", e => { if (e.key === "Enter") addCandidate(); });
+function updateSetupDisplay() {
+  document.getElementById("setupDisplay").textContent = Object.entries(departments)
+    .map(([dept, list]) => dept + ": " + list.join(", ")).join("\n");
+}
+function saveDepartments() {
+  localStorage.setItem("departments", JSON.stringify(departments));
+  updateSetupDisplay();
+  updateDepartmentDropdowns();
+}
+function addDepartment() {
+  const name = document.getElementById("departmentName").value.trim();
+  if (name && !departments[name]) {
+    departments[name] = [];
+    saveDepartments();
+    document.getElementById("departmentName").value = "";
+  }
+}
+function addCandidate() {
+  const dept = document.getElementById("departmentSelect").value;
+  const name = document.getElementById("candidateName").value.trim();
+  if (dept && name && !departments[dept].includes(name)) {
+    departments[dept].push(name);
+    saveDepartments();
+    document.getElementById("candidateName").value = "";
+    document.getElementById("departmentSelect").value = dept;
+  }
+}
+function updateDepartmentDropdowns() {
+  const deptSelect = document.getElementById("departmentSelect");
+  const voterDept = document.getElementById("voterDept");
+  const selectedDept = deptSelect.value;
+  deptSelect.innerHTML = "";
+  voterDept.innerHTML = "<option value=''>Select Department</option>";
+  for (let dept in departments) {
+    deptSelect.innerHTML += `<option value="${dept}">${dept}</option>`;
+    voterDept.innerHTML += `<option value="${dept}">${dept}</option>`;
+  }
+  if (selectedDept) deptSelect.value = selectedDept;
+  updateVoterNames();
+}
+function updateVoterNames() {
+  const dept = document.getElementById("voterDept").value;
+  const voterName = document.getElementById("voterName");
+  voterName.innerHTML = "<option value=''>Select Your Name</option>";
+  if (dept && departments[dept]) {
+    departments[dept].forEach(name => {
+      voterName.innerHTML += `<option value="${name}">${name}</option>`;
     });
-
-    function saveDepartments() {
-      localStorage.setItem("departments", JSON.stringify(departments));
-      updateSetupDisplay();
-      updateVotingSelectors();
-    }
-
-    function addDepartment() {
-      const name = document.getElementById("departmentName").value.trim();
-      if (name && !departments[name]) {
-        departments[name] = [];
-        saveDepartments();
-        document.getElementById("departmentName").value = "";
-      }
-    }
-
-    function addCandidate() {
-      const deptSelect = document.getElementById("departmentSelect");
-      const dept = deptSelect.value;
-      const name = document.getElementById("candidateName").value.trim();
-      if (dept && name && !departments[dept].includes(name)) {
-        departments[dept].push(name);
-        saveDepartments();
-        document.getElementById("candidateName").value = "";
-        setTimeout(() => { deptSelect.value = dept; }, 0);
-      }
-    }
-
-    function updateSetupDisplay() {
-      document.getElementById("setupDisplay").textContent = Object.entries(departments)
-        .map(([dept, list]) => `${dept}: ${list.join(', ')}`)
-        .join('\n');
-    }
-
-    function updateVotingSelectors() {
-      const deptSelect = document.getElementById("departmentSelect");
-      const voterDept = document.getElementById("voterDept");
-      const selectedDept = deptSelect.value;
-      deptSelect.innerHTML = "";
-      voterDept.innerHTML = "<option value=''>Select Department</option>";
-      for (let dept in departments) {
-        deptSelect.innerHTML += `<option value="${dept}">${dept}</option>`;
-        voterDept.innerHTML += `<option value="${dept}">${dept}</option>`;
-      }
-      if (selectedDept) deptSelect.value = selectedDept;
-      updateVoterNames();
-    }
-
-    function updateVoterNames() {
-      const dept = document.getElementById("voterDept").value;
-      const voterName = document.getElementById("voterName");
-      voterName.innerHTML = "<option value=''>Select Your Name</option>";
-      if (dept && departments[dept]) {
-        departments[dept].forEach(name => {
-          voterName.innerHTML += `<option value="${name}">${name}</option>`;
-        });
-      }
-    }
-
-    document.getElementById("voterName").addEventListener('change', buildVotingForm);
-
-    function buildVotingForm() {
-      const ownDept = document.getElementById("voterDept").value;
-      const ownName = document.getElementById("voterName").value;
-      const votingArea = document.getElementById("votingArea");
-      if (!ownDept || !ownName) return;
-      votingArea.innerHTML = "<h3>Rank 1 = Most Preferred</h3>";
-      for (let dept in departments) {
-        if (dept !== ownDept) {
-          const label = document.createElement('label');
-          label.innerText = `Select from ${dept}:`;
-          const select = document.createElement('select');
-          select.name = dept;
-          select.required = true;
-          select.innerHTML = `<option value="">-- Select --</option>`;
-          departments[dept].forEach(name => {
-            if (name !== ownName) {
-              select.innerHTML += `<option value="${name}">${name}</option>`;
-            }
-          });
-          votingArea.appendChild(label);
-          votingArea.appendChild(select);
-        }
-      }
-    }
-
-    function submitVote() {
-      const ownDept = document.getElementById("voterDept").value;
-      const ownName = document.getElementById("voterName").value;
-      if (!ownDept || !ownName) return alert("Select your department and name first.");
-      const selects = document.querySelectorAll("#votingArea select");
-      const preferences = [];
-      const selected = new Set();
-      selects.forEach(select => {
-        const candidate = select.value;
-        if (!candidate) return;
-        if (selected.has(candidate)) return alert("Duplicate candidate selection not allowed.");
-        selected.add(candidate);
-        preferences.push({ department: select.name, candidate });
+  }
+}
+function buildVotingForm() {
+  const ownDept = document.getElementById("voterDept").value;
+  const ownName = document.getElementById("voterName").value;
+  const votingArea = document.getElementById("votingArea");
+  if (!ownDept || !ownName) return;
+  votingArea.innerHTML = "<h3>Rank preferences for each department</h3>";
+  for (let dept in departments) {
+    if (dept !== ownDept) {
+      votingArea.innerHTML += `<div class="rank-label">${dept} Department:</div>`;
+      departments[dept].forEach((candidate, index) => {
+        votingArea.innerHTML += `
+          <label>${index + 1}st Choice:</label>
+          <select name="${dept}" data-rank="${index + 1}" onchange="checkDuplicates('${dept}')">
+            <option value="">-- Select --</option>
+            ${departments[dept].map(name => `<option value="${name}">${name}</option>`).join('')}
+          </select>`;
       });
-      if (preferences.length !== selects.length) {
-        return alert("Please select one candidate from each department.");
+    }
+  }
+}
+function checkDuplicates(dept) {
+  const selects = [...document.querySelectorAll("select[name='" + dept + "']")];
+  const seen = new Set();
+  for (const select of selects) {
+    const val = select.value;
+    if (val && seen.has(val)) {
+      alert("Duplicate selection in " + dept + ". Use unique preferences.");
+      select.value = "";
+      return false;
+    }
+    seen.add(val);
+  }
+  return true;
+}
+function submitVote() {
+  const dept = document.getElementById("voterDept").value;
+  const name = document.getElementById("voterName").value;
+  const selects = [...document.querySelectorAll("#votingArea select")];
+  const preferences = {};
+  const selected = new Set();
+  selects.forEach(select => {
+    const d = select.name;
+    const rank = parseInt(select.getAttribute("data-rank"));
+    const val = select.value;
+    if (!preferences[d]) preferences[d] = [];
+    if (val && !selected.has(d + "_" + val)) {
+      preferences[d][rank - 1] = val;
+      selected.add(d + "_" + val);
+    }
+  });
+  const prev = votes.find(v => v.voter === name);
+  if (prev && !confirm("Replace previous vote?")) return;
+  if (prev) votes = votes.filter(v => v.voter !== name);
+  votes.push({ voter: name, department: dept, preferences });
+  localStorage.setItem("votes", JSON.stringify(votes));
+  document.getElementById("voteMsg").innerText = "Vote submitted! Now call the next student for VOTING ";
+  document.getElementById("votingArea").innerHTML = "";
+  document.getElementById("voterDept").value = "";
+  document.getElementById("voterName").innerHTML = "";
+}
+function generateTeams() {
+  const all = Object.entries(departments).flatMap(([d, names]) => names.map(n => ({ name: n, department: d })));
+  const scores = {};
+  all.forEach(c => scores[c.name] = {});
+  votes.forEach(v => {
+    for (let d in v.preferences) {
+      v.preferences[d].forEach((cand, idx) => {
+        const w = departments[d].length - idx;
+        scores[v.voter][cand] = (scores[v.voter][cand] || 0) + w;
+        scores[cand][v.voter] = (scores[cand][v.voter] || 0) + w;
+      });
+    }
+  });
+  const n = Math.max(...Object.values(departments).map(d => d.length));
+  const slots = Array.from({ length: n }, () => ({}));
+  Object.entries(departments).forEach(([dept, list]) => {
+    const used = {};
+    list.forEach(c => used[c] = 0);
+    for (let i = 0; i < n; i++) {
+      let best = null, bestScore = -Infinity;
+      list.forEach(c => {
+        if (used[c] >= Math.ceil(n / list.length)) return;
+        const score = Object.values(slots[i]).reduce((s, p) => s + (scores[c][p] || 0), 0);
+        if (score > bestScore) best = c, bestScore = score;
+      });
+      if (best) {
+        slots[i][dept] = best;
+        used[best]++;
       }
-      const alreadyVoted = votes.find(v => v.voter === ownName);
-      if (alreadyVoted) {
-        if (!confirm("You’ve already voted. Replace vote? ")) return;
-        votes = votes.filter(v => v.voter !== ownName);
-      }
-      votes.push({ voter: ownName, department: ownDept, preferences });
+    }
+  });
+  document.getElementById("teamsDisplay").textContent = slots.map((t, i) =>
+    (greekNames[i] || `Team ${i+1}`) + ": " + Object.entries(t).map(([d, n]) => `${n} (${d})`).join(", ")
+  ).join("\n");
+}
+function downloadTeamsTxt() {
+  const t = document.getElementById("teamsDisplay").innerText;
+  if (!t.trim()) return alert("Generate teams first.");
+  const blob = new Blob([t], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "final_teams.txt"; a.click(); URL.revokeObjectURL(url);
+}
+function exportVotes() {
+  const name = prompt("Enter filename:");
+  if (!name) return;
+  const blob = new Blob([JSON.stringify(votes, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = name + ".json"; a.click(); URL.revokeObjectURL(url);
+}
+function importVotes(e) {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = function(evt) {
+    try {
+      votes = JSON.parse(evt.target.result);
       localStorage.setItem("votes", JSON.stringify(votes));
-      document.getElementById("voteMsg").innerText = "Vote submitted successfully! You can go now. Call the next student for voting";
-      document.getElementById("votingArea").innerHTML = "";
-      document.getElementById("voterDept").value = "";
-      document.getElementById("voterName").innerHTML = "";
-    }
-
-    function generateTeams() {
-      const allCandidates = Object.entries(departments).flatMap(([dept, names]) => names.map(name => ({ name, department: dept })));
-      const mutualScores = {};
-      allCandidates.forEach(c => { mutualScores[c.name] = {}; });
-      votes.forEach(vote => {
-        vote.preferences.forEach(pref => {
-          const v = vote.voter;
-          const c = pref.candidate;
-          mutualScores[v][c] = (mutualScores[v][c] || 0) + 1;
-          mutualScores[c][v] = (mutualScores[c][v] || 0) + 1;
-        });
-      });
-      const numTeams = Math.max(...Object.values(departments).map(d => d.length));
-      const teamSlots = Array.from({ length: numTeams }, () => ({}));
-      Object.entries(departments).forEach(([dept, deptCandidates]) => {
-        const usage = {};
-        deptCandidates.forEach(c => usage[c] = 0);
-        for (let i = 0; i < numTeams; i++) {
-          let best = null, bestScore = -Infinity;
-          deptCandidates.forEach(c => {
-            const maxAllowed = Math.ceil(numTeams / deptCandidates.length);
-            if (usage[c] >= maxAllowed) return;
-            const score = Object.values(teamSlots[i]).reduce((sum, p) => sum + (mutualScores[c][p] || 0), 0);
-            if (score > bestScore) {
-              bestScore = score;
-              best = c;
-            }
-          });
-          if (best) {
-            teamSlots[i][dept] = best;
-            usage[best]++;
-          }
-        }
-      });
-      const output = teamSlots.map((team, i) => {
-        const label = greekNames[i] || `Team ${i + 1}`;
-        const members = Object.entries(team).map(([dept, name]) => `${name} (${dept})`).join(', ');
-        return `${label}: ${members}`;
-      });
-      document.getElementById("teamsDisplay").textContent = output.join("\n");
-    }
-
-    function downloadTeamsTxt() {
-      const text = document.getElementById("teamsDisplay").innerText;
-      if (!text.trim()) return alert("No teams generated yet.");
-      const blob = new Blob([text], { type: "text/plain" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "final_teams.txt";
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-
-    function exportVotes() {
-      const filename = prompt("Enter a name for this voting session:");
-      if (!filename) return;
-      const blob = new Blob([JSON.stringify(votes, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename + ".json";
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-
-    function importVotes(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        try {
-          votes = JSON.parse(e.target.result);
-          localStorage.setItem("votes", JSON.stringify(votes));
-          alert("Voting session imported successfully.");
-        } catch {
-          alert("Invalid JSON file.");
-        }
-      };
-      reader.readAsText(file);
-    }
-
-    function resetAll() {
-      if (confirm("This will erase all data. Continue?")) {
-        localStorage.clear();
-        location.reload();
-      }
-    }
-  </script>
+      alert("Imported successfully.");
+    } catch { alert("Invalid JSON."); }
+  };
+  r.readAsText(f);
+}
+function resetAll() {
+  if (confirm("This clears all data. Proceed?")) {
+    localStorage.clear();
+    location.reload();
+  }
+}
+window.onload = function() {
+  updateSetupDisplay(); updateDepartmentDropdowns();
+  document.getElementById("addDeptBtn").onclick = addDepartment;
+  document.getElementById("addCandBtn").onclick = addCandidate;
+  document.getElementById("departmentName").addEventListener("keypress", e => { if (e.key === "Enter") addDepartment(); });
+  document.getElementById("candidateName").addEventListener("keypress", e => { if (e.key === "Enter") addCandidate(); });
+  document.getElementById("voterName").addEventListener("change", buildVotingForm);
+};
+</script>
 </body>
 </html>
