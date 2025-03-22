@@ -1,8 +1,9 @@
+
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Preferential Voting & Greek Team Generator</title>
+  <title>Preferential Voting & Intelligent Team Generator</title>
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; max-width: 900px; }
     .section { margin-bottom: 30px; }
@@ -96,11 +97,7 @@
         departments[dept].push(name);
         saveDepartments();
         document.getElementById("candidateName").value = "";
-
-        // 👇 Restore previously selected department
-        setTimeout(() => {
-          deptSelect.value = dept;
-        }, 0);
+        setTimeout(() => { deptSelect.value = dept; }, 0);
       }
     }
 
@@ -113,19 +110,14 @@
     function updateVotingSelectors() {
       const deptSelect = document.getElementById("departmentSelect");
       const voterDept = document.getElementById("voterDept");
-
       const selectedDept = deptSelect.value;
-
       deptSelect.innerHTML = "";
       voterDept.innerHTML = "<option value=''>Select Department</option>";
       for (let dept in departments) {
         deptSelect.innerHTML += `<option value="${dept}">${dept}</option>`;
         voterDept.innerHTML += `<option value="${dept}">${dept}</option>`;
       }
-
-      // 👇 Re-select last chosen department
       if (selectedDept) deptSelect.value = selectedDept;
-
       updateVoterNames();
     }
 
@@ -147,13 +139,11 @@
       const ownName = document.getElementById("voterName").value;
       const votingArea = document.getElementById("votingArea");
       if (!ownDept || !ownName) return;
-
       votingArea.innerHTML = "<h3>Rank 1 = Most Preferred</h3>";
       for (let dept in departments) {
         if (dept !== ownDept) {
           const label = document.createElement('label');
           label.innerText = `Select from ${dept}:`;
-
           const select = document.createElement('select');
           select.name = dept;
           select.required = true;
@@ -163,7 +153,6 @@
               select.innerHTML += `<option value="${name}">${name}</option>`;
             }
           });
-
           votingArea.appendChild(label);
           votingArea.appendChild(select);
         }
@@ -174,81 +163,72 @@
       const ownDept = document.getElementById("voterDept").value;
       const ownName = document.getElementById("voterName").value;
       if (!ownDept || !ownName) return alert("Select your department and name first.");
-
       const selects = document.querySelectorAll("#votingArea select");
       const preferences = [];
       const selected = new Set();
-
       selects.forEach(select => {
         const candidate = select.value;
         if (!candidate) return;
-        if (selected.has(candidate)) {
-          return alert("Duplicate candidate selection not allowed.");
-        }
+        if (selected.has(candidate)) return alert("Duplicate candidate selection not allowed.");
         selected.add(candidate);
         preferences.push({ department: select.name, candidate });
       });
-
       if (preferences.length !== selects.length) {
         return alert("Please select one candidate from each department.");
       }
-
       const alreadyVoted = votes.find(v => v.voter === ownName);
       if (alreadyVoted) {
         if (!confirm("You’ve already voted. Replace vote?")) return;
         votes = votes.filter(v => v.voter !== ownName);
       }
-
       votes.push({ voter: ownName, department: ownDept, preferences });
       localStorage.setItem("votes", JSON.stringify(votes));
-      document.getElementById("voteMsg").innerText = "Vote submitted successfully!";
+      document.getElementById("voteMsg").innerText = "Vote submitted successfully! You can go now. Call the next student for voting";
       document.getElementById("votingArea").innerHTML = "";
       document.getElementById("voterDept").value = "";
       document.getElementById("voterName").innerHTML = "";
     }
 
     function generateTeams() {
-      const names = Object.values(departments).flat();
-      const compatibility = {};
-      names.forEach(name => compatibility[name] = {});
-      votes.forEach(vote => {
-        vote.preferences.forEach((pref, idx) => {
-          const score = 6 - idx;
-          compatibility[vote.voter][pref.candidate] = (compatibility[vote.voter][pref.candidate] || 0) + score;
-        });
-      });
-
+      const allCandidates = Object.entries(departments).flatMap(([dept, names]) => names.map(name => ({ name, department: dept })));
       const mutualScores = {};
-      names.forEach(a => {
-        mutualScores[a] = {};
-        names.forEach(b => {
-          mutualScores[a][b] = (compatibility[a]?.[b] || 0) + (compatibility[b]?.[a] || 0);
+      allCandidates.forEach(c => { mutualScores[c.name] = {}; });
+      votes.forEach(vote => {
+        vote.preferences.forEach(pref => {
+          const v = vote.voter;
+          const c = pref.candidate;
+          mutualScores[v][c] = (mutualScores[v][c] || 0) + 1;
+          mutualScores[c][v] = (mutualScores[c][v] || 0) + 1;
         });
       });
-
-      const teamCount = Math.max(...Object.values(departments).map(d => d.length));
-      const teams = Array.from({ length: teamCount }, () => []);
-      const assigned = new Set();
-
-      while (assigned.size < names.length) {
-        let remaining = names.filter(n => !assigned.has(n));
-        let bestPair = [null, null, -1];
-
-        remaining.forEach(a => remaining.forEach(b => {
-          if (a !== b && mutualScores[a][b] > bestPair[2]) {
-            bestPair = [a, b, mutualScores[a][b]];
+      const numTeams = Math.max(...Object.values(departments).map(d => d.length));
+      const teamSlots = Array.from({ length: numTeams }, () => ({}));
+      Object.entries(departments).forEach(([dept, deptCandidates]) => {
+        const usage = {};
+        deptCandidates.forEach(c => usage[c] = 0);
+        for (let i = 0; i < numTeams; i++) {
+          let best = null, bestScore = -Infinity;
+          deptCandidates.forEach(c => {
+            const maxAllowed = Math.ceil(numTeams / deptCandidates.length);
+            if (usage[c] >= maxAllowed) return;
+            const score = Object.values(teamSlots[i]).reduce((sum, p) => sum + (mutualScores[c][p] || 0), 0);
+            if (score > bestScore) {
+              bestScore = score;
+              best = c;
+            }
+          });
+          if (best) {
+            teamSlots[i][dept] = best;
+            usage[best]++;
           }
-        }));
-
-        let [a, b] = bestPair;
-        let team = teams.sort((t1, t2) => t1.length - t2.length)[0];
-        if (a) team.push(a), assigned.add(a);
-        if (b && !assigned.has(b)) team.push(b), assigned.add(b);
-      }
-
-      const output = teams.map((team, i) =>
-        `${greekNames[i] || "Team " + (i + 1)}: ${team.join(', ')}`).join('\n');
-      document.getElementById("teamsDisplay").textContent = output;
+        }
+      });
+      const output = teamSlots.map((team, i) => {
+        const label = greekNames[i] || `Team ${i + 1}`;
+        const members = Object.entries(team).map(([dept, name]) => `${name} (${dept})`).join(', ');
+        return `${label}: ${members}`;
+      });
+      document.getElementById("teamsDisplay").textContent = output.join("\n");
     }
 
     function downloadTeamsTxt() {
@@ -298,6 +278,5 @@
       }
     }
   </script>
-
 </body>
 </html>
